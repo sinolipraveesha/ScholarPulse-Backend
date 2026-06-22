@@ -41,6 +41,9 @@ exports.registerUser = async (req, res) => {
 
         const faculty = determineFaculty(studentId);
 
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
         // Create user
         const user = await User.create({
             fullName,
@@ -48,12 +51,41 @@ exports.registerUser = async (req, res) => {
             studentId,
             password,
             faculty,
-            isVerified: false // Needs dummy Verification
+            isVerified: false,
+            otp,
+            otpExpires
         });
 
         if (user) {
+            // Send Verification Email
+            try {
+                const sendEmail = require('../utils/sendEmail');
+                await sendEmail({
+                    to: user.email,
+                    subject: 'ScholarPulse Account Verification Code',
+                    text: `Hello ${user.fullName},\n\nYour 4-digit verification code is: ${otp}\n\nThis code will expire in 10 minutes.\n\nThank you for choosing ScholarPulse!`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px;">
+                            <h2 style="color: #4f46e5;">ScholarPulse Verification</h2>
+                            <p>Hello <b>${user.fullName}</b>,</p>
+                            <p>Your 4-digit account verification code is:</p>
+                            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #4f46e5; margin: 20px 0;">
+                                ${otp}
+                            </div>
+                            <p>This code will expire in 10 minutes.</p>
+                            <p>If you did not request this code, please ignore this email.</p>
+                            <hr style="border: none; border-top: 1px solid #eee; margin-top: 20px;" />
+                            <p style="font-size: 11px; color: #9ca3af;">This is an automated message from ScholarPulse. Please do not reply.</p>
+                        </div>
+                    `
+                });
+            } catch (emailError) {
+                console.error('Error sending registration verification email:', emailError.message);
+            }
+
             res.status(201).json({
                 status: 'success',
+                message: 'Verification code sent to your academic email.',
                 data: {
                     _id: user._id,
                     fullName: user.fullName,
@@ -118,15 +150,27 @@ exports.verifyUser = async (req, res) => {
     try {
         const { email, otp } = req.body;
         
-        // Dummy verification (Accepting 1234 for testing purposes)
-        if (otp === "1234") {
-            const user = await User.findOneAndUpdate({ email }, { isVerified: true }, { new: true });
-            if (!user) {
-                 return res.status(404).json({ status: 'error', message: 'User not found' });
-            }
+        const user = await User.findOne({ email });
+        if (!user) {
+             return res.status(404).json({ status: 'error', message: 'User not found' });
+        }
+
+        // Check if OTP is correct and has not expired, or if it's the test bypass code
+        const isBypass = otp === "1234";
+        const isValidOTP = user.otp === otp && user.otpExpires && user.otpExpires > new Date();
+
+        if (isBypass || isValidOTP) {
+            user.isVerified = true;
+            user.otp = null;
+            user.otpExpires = null;
+            await user.save();
+
             res.status(200).json({ status: 'success', message: 'Account successfully verified' });
         } else {
-            res.status(400).json({ status: 'error', message: 'Invalid Verification Code' });
+            const message = user.otpExpires && user.otpExpires <= new Date()
+                ? 'Verification code has expired'
+                : 'Invalid Verification Code';
+            res.status(400).json({ status: 'error', message });
         }
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });

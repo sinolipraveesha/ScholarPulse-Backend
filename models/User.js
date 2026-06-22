@@ -40,6 +40,14 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    otp: {
+        type: String,
+        default: null
+    },
+    otpExpires: {
+        type: Date,
+        default: null
+    },
     avatar: {
         type: String,
         default: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?q=80&w=200&auto=format&fit=crop'
