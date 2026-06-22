@@ -40,7 +40,7 @@ const AdminDashboardScreen = ({ navigation }) => {
         {
             id: 'resources',
             title: 'Resources',
-            subtitle: 'E-Library and Lab schedule updates',
+            subtitle: 'View and manage resources uploaded by students',
             icon: 'library',
             color: '#8B5CF6',
             bg: '#F5F3FF'
@@ -71,15 +71,17 @@ const AdminDashboardScreen = ({ navigation }) => {
             navigation.navigate('AdminComplaints');
         } else if (id === 'lostfound') {
             navigation.navigate('AdminLostFound');
+        } else if (id === 'resources') {
+            navigation.navigate('AdminResourceManagement');
         } else {
             Alert.alert('Info', `${id.charAt(0).toUpperCase() + id.slice(1)} Management coming soon!`);
         }
     };
 
     const renderActionCard = (item) => (
-        <TouchableOpacity 
-            key={item.id} 
-            style={styles.card} 
+        <TouchableOpacity
+            key={item.id}
+            style={styles.card}
             activeOpacity={0.7}
             onPress={() => handlePress(item.id)}
         >
@@ -96,7 +98,7 @@ const AdminDashboardScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView 
+            <ScrollView
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.scrollContent}
             >

@@ -1,7 +1,43 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, ScrollView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, ScrollView, Platform, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../theme/theme';
+
+// Sri Lankan phone validation: 07X XXXXXXX (10 digits) or +947X XXXXXXX or 0XX XXXXXXX (landline)
+const validateSLPhone = (phone) => {
+    if (!phone || phone.trim() === '') return { valid: false, message: 'Phone number is required' };
+    const cleaned = phone.replace(/[\s\-()]/g, '');
+    // Mobile: 07X followed by 7 digits
+    if (/^07[0-9]{8}$/.test(cleaned)) return { valid: true, message: '' };
+    // Mobile with +94: +947X followed by 7 digits
+    if (/^\+947[0-9]{8}$/.test(cleaned)) return { valid: true, message: '' };
+    // Landline: 0XX followed by 7 digits (e.g., 011 XXXXXXX)
+    if (/^0[1-9][0-9]{8}$/.test(cleaned)) return { valid: true, message: '' };
+    // Landline with +94
+    if (/^\+94[1-9][0-9]{8}$/.test(cleaned)) return { valid: true, message: '' };
+    return { valid: false, message: 'Enter a valid Sri Lankan number (e.g., 07X XXXXXXX)' };
+};
+
+const validateTitle = (title) => {
+    if (!title || title.trim() === '') return { valid: false, message: 'Item title is required' };
+    if (title.trim().length < 3) return { valid: false, message: 'Title must be at least 3 characters' };
+    if (title.trim().length > 100) return { valid: false, message: 'Title must be under 100 characters' };
+    return { valid: true, message: '' };
+};
+
+const validateLocation = (location) => {
+    if (!location || location.trim() === '') return { valid: false, message: 'Location is required' };
+    if (location.trim().length < 3) return { valid: false, message: 'Location must be at least 3 characters' };
+    return { valid: true, message: '' };
+};
+
+const validateDescription = (desc, type) => {
+    if (type === 'lost') {
+        if (!desc || desc.trim() === '') return { valid: false, message: 'Description is required for lost items' };
+        if (desc.trim().length < 10) return { valid: false, message: 'Description must be at least 10 characters' };
+    }
+    return { valid: true, message: '' };
+};
 
 export default function ReportForm({
     isEditing,
@@ -19,6 +55,80 @@ export default function ReportForm({
     onPublish,
     onClose,
 }) {
+    const [errors, setErrors] = useState({});
+    const [touched, setTouched] = useState({});
+    const shakeAnim = React.useRef(new Animated.Value(0)).current;
+
+    // Revalidate on field change if already touched
+    useEffect(() => {
+        if (touched.title) {
+            setErrors(prev => ({ ...prev, title: validateTitle(formTitle).message }));
+        }
+    }, [formTitle]);
+
+    useEffect(() => {
+        if (touched.location) {
+            setErrors(prev => ({ ...prev, location: validateLocation(formLocation).message }));
+        }
+    }, [formLocation]);
+
+    useEffect(() => {
+        if (touched.desc) {
+            setErrors(prev => ({ ...prev, desc: validateDescription(formDesc, formType).message }));
+        }
+    }, [formDesc, formType]);
+
+    useEffect(() => {
+        if (touched.phone) {
+            setErrors(prev => ({ ...prev, phone: validateSLPhone(formPhone).message }));
+        }
+    }, [formPhone]);
+
+    const triggerShake = () => {
+        Animated.sequence([
+            Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: 6, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: -6, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+        ]).start();
+    };
+
+    const handlePublish = () => {
+        const titleResult = validateTitle(formTitle);
+        const locationResult = validateLocation(formLocation);
+        const descResult = validateDescription(formDesc, formType);
+        const phoneResult = validateSLPhone(formPhone);
+
+        const newErrors = {
+            title: titleResult.message,
+            location: locationResult.message,
+            desc: descResult.message,
+            phone: phoneResult.message,
+        };
+
+        setErrors(newErrors);
+        setTouched({ title: true, location: true, desc: true, phone: true });
+
+        const hasErrors = Object.values(newErrors).some(e => e !== '');
+        if (hasErrors) {
+            triggerShake();
+            return;
+        }
+
+        onPublish();
+    };
+
+    const renderFieldError = (field) => {
+        if (!errors[field]) return null;
+        return (
+            <Animated.View style={[styles.errorContainer, { transform: [{ translateX: shakeAnim }] }]}>
+                <Ionicons name="alert-circle" size={14} color={theme.colors.danger} />
+                <Text style={styles.errorText}>{errors[field]}</Text>
+            </Animated.View>
+        );
+    };
+
     return (
         <ScrollView 
             style={styles.formContainer} 
@@ -28,17 +138,23 @@ export default function ReportForm({
         >
             {/* Form Top Bar */}
             <View style={styles.formTopBar}>
-                <TouchableOpacity onPress={onClose}>
-                    <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
+                <TouchableOpacity onPress={onClose} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={22} color={theme.colors.primary} />
                 </TouchableOpacity>
-                <Text style={styles.formTopTitle}>{isEditing ? 'Update Report' : 'Report Lost Item'}</Text>
-                <View style={{ width: 24 }} />
+                <TouchableOpacity onPress={onClose} activeOpacity={0.7}>
+                    <Text style={styles.formTopTitle}>
+                        {isEditing ? '← Lost & Found' : 'Report Lost Item'}
+                    </Text>
+                </TouchableOpacity>
+                <View style={{ width: 36 }} />
             </View>
 
             {/* Form Header */}
             <View style={styles.formHeaderRow}>
                 <Text style={styles.formMainTitle}>{isEditing ? 'Edit Details' : 'Discovery Details'}</Text>
-                <Text style={styles.formStepText}>{isEditing ? 'EDITING' : 'STEP 01'}</Text>
+                <View style={styles.stepBadge}>
+                    <Text style={styles.formStepText}>{isEditing ? 'EDITING' : 'STEP 01'}</Text>
+                </View>
             </View>
 
             {/* Form Type Toggle */}
@@ -107,8 +223,8 @@ export default function ReportForm({
             )}
 
             {/* Item Title */}
-            <Text style={styles.formSectionLabel}>ITEM TITLE</Text>
-            <View style={styles.iconInputContainer}>
+            <Text style={styles.formSectionLabel}>ITEM TITLE <Text style={styles.requiredStar}>*</Text></Text>
+            <View style={[styles.iconInputContainer, errors.title ? styles.inputError : null]}>
                 <Ionicons name="pricetag" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
                 <TextInput 
                     style={styles.iconInput}
@@ -116,12 +232,17 @@ export default function ReportForm({
                     placeholderTextColor="#A1A5CD"
                     value={formTitle}
                     onChangeText={setFormTitle}
+                    onBlur={() => setTouched(prev => ({ ...prev, title: true }))}
+                    maxLength={100}
                 />
             </View>
+            {renderFieldError('title')}
 
             {/* Location */}
-            <Text style={styles.formSectionLabel}>{formType === 'lost' ? 'WHERE DID YOU LAST SEE IT?' : 'WHERE DID YOU FIND IT?'}</Text>
-            <View style={styles.iconInputContainer}>
+            <Text style={styles.formSectionLabel}>
+                {formType === 'lost' ? 'WHERE DID YOU LAST SEE IT?' : 'WHERE DID YOU FIND IT?'} <Text style={styles.requiredStar}>*</Text>
+            </Text>
+            <View style={[styles.iconInputContainer, errors.location ? styles.inputError : null]}>
                 <Ionicons name="location" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
                 <TextInput 
                     style={styles.iconInput}
@@ -129,40 +250,50 @@ export default function ReportForm({
                     placeholderTextColor="#A1A5CD"
                     value={formLocation}
                     onChangeText={setFormLocation}
+                    onBlur={() => setTouched(prev => ({ ...prev, location: true }))}
                 />
             </View>
+            {renderFieldError('location')}
 
             {/* Description */}
             <Text style={styles.formSectionLabel}>
-                {formType === 'found' ? 'ITEM DESCRIPTION (OPTIONAL)' : 'ITEM DESCRIPTION'}
+                ITEM DESCRIPTION {formType === 'lost' ? <Text style={styles.requiredStar}>*</Text> : '(OPTIONAL)'}
             </Text>
             <TextInput 
-                style={styles.formTextArea}
+                style={[styles.formTextArea, errors.desc ? styles.inputError : null]}
                 placeholder="Describe unique markings, stickers, or brand names..."
                 placeholderTextColor="#A1A5CD"
                 multiline
                 value={formDesc}
                 onChangeText={setFormDesc}
+                onBlur={() => setTouched(prev => ({ ...prev, desc: true }))}
             />
+            {renderFieldError('desc')}
 
             {/* Phone Number */}
-            <Text style={styles.formSectionLabel}>PHONE NUMBER</Text>
-            <View style={styles.phoneInputContainer}>
-                <Ionicons name="call" size={20} color={theme.colors.primary} style={{ marginRight: 10 }} />
+            <Text style={styles.formSectionLabel}>PHONE NUMBER <Text style={styles.requiredStar}>*</Text></Text>
+            <View style={[styles.phoneInputContainer, errors.phone ? styles.inputError : null]}>
+                <View style={styles.phonePrefix}>
+                    <Text style={styles.phonePrefixFlag}>🇱🇰</Text>
+                    <Text style={styles.phonePrefixText}>+94</Text>
+                </View>
                 <TextInput 
                     style={styles.phoneInput}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="07X XXXXXXX"
                     placeholderTextColor="#A1A5CD"
                     keyboardType="phone-pad"
                     value={formPhone}
                     onChangeText={setFormPhone}
+                    onBlur={() => setTouched(prev => ({ ...prev, phone: true }))}
+                    maxLength={15}
                 />
             </View>
+            {renderFieldError('phone')}
 
             {/* Submit */}
             <TouchableOpacity 
                 style={[styles.publishBtn, isLoading && { opacity: 0.7 }]} 
-                onPress={onPublish}
+                onPress={handlePublish}
                 disabled={isLoading}
             >
                 <Text style={styles.publishBtnText}>
@@ -189,15 +320,23 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 30,
     },
+    backButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: theme.colors.primaryLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     formTopTitle: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '800',
         color: theme.colors.primary,
     },
     formHeaderRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         marginBottom: 20,
     },
     formMainTitle: {
@@ -205,19 +344,24 @@ const styles = StyleSheet.create({
         fontWeight: '900',
         color: '#1E1B4B',
     },
+    stepBadge: {
+        backgroundColor: theme.colors.primaryLight,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
     formStepText: {
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: '800',
         color: theme.colors.primary,
         letterSpacing: 1,
-        marginBottom: 4,
     },
     formToggleContainer: {
         flexDirection: 'row',
         backgroundColor: '#EBECEF',
         borderRadius: 30,
         padding: 4,
-        marginBottom: 30,
+        marginBottom: 28,
     },
     formToggleBtn: {
         flex: 1,
@@ -254,7 +398,12 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
         letterSpacing: 1.2,
         textTransform: 'uppercase',
-        marginBottom: 12,
+        marginBottom: 10,
+    },
+    requiredStar: {
+        color: theme.colors.danger,
+        fontSize: 13,
+        fontWeight: '900',
     },
     uploadContainer: {
         borderWidth: 2,
@@ -264,7 +413,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F1F5F9',
         padding: 30,
         alignItems: 'center',
-        marginBottom: 30,
+        marginBottom: 24,
     },
     cameraIconWrapper: {
         width: 60,
@@ -302,7 +451,7 @@ const styles = StyleSheet.create({
         color: theme.colors.primary,
     },
     vaultScroll: {
-        marginBottom: 30,
+        marginBottom: 24,
     },
     vaultCard: {
         backgroundColor: '#FFF',
@@ -349,7 +498,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: 16,
         height: 56,
-        marginBottom: 30,
+        marginBottom: 6,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    inputError: {
+        borderColor: theme.colors.danger,
+        borderWidth: 2,
     },
     iconInput: {
         flex: 1,
@@ -366,22 +521,57 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#1E1B4B',
         fontWeight: '500',
-        marginBottom: 30,
+        marginBottom: 6,
+        borderWidth: 2,
+        borderColor: 'transparent',
     },
     phoneInputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#E0E7FF',
         borderRadius: 12,
-        paddingHorizontal: 16,
+        paddingHorizontal: 12,
         height: 56,
-        marginBottom: 40,
+        marginBottom: 6,
+        borderWidth: 2,
+        borderColor: 'transparent',
+    },
+    phonePrefix: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#C7D2FE',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 8,
+        marginRight: 10,
+    },
+    phonePrefixFlag: {
+        fontSize: 16,
+        marginRight: 4,
+    },
+    phonePrefixText: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#1E1B4B',
     },
     phoneInput: {
         flex: 1,
         fontSize: 15,
         color: '#1E1B4B',
         fontWeight: '600',
+    },
+    errorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 18,
+        marginTop: 4,
+        paddingLeft: 4,
+    },
+    errorText: {
+        color: theme.colors.danger,
+        fontSize: 12,
+        fontWeight: '600',
+        marginLeft: 6,
     },
     publishBtn: {
         backgroundColor: '#4F46E5',
@@ -396,6 +586,7 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 6,
         marginBottom: 12,
+        marginTop: 20,
     },
     publishBtnText: {
         color: '#FFF',

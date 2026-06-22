@@ -291,33 +291,36 @@ export default function AdminLostFoundScreen({ navigation }) {
     const totalLost  = items.filter(i => i.type === 'lost').length;
     const totalFound = items.filter(i => i.type === 'found').length;
 
+    const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState(null);
+
     /* Delete handler */
     const handleDelete = (itemId) => {
-        Alert.alert(
-            'Remove Listing',
-            'Are you sure you want to permanently remove this listing? This cannot be undone.',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Remove',
-                    style: 'destructive',
-                    onPress: async () => {
-                        setIsDeleting(true);
-                        try {
-                            await axios.delete(`${BASE_URL}/lostfound/admin/${itemId}`, {
-                                headers: { Authorization: `Bearer ${token}` },
-                            });
-                            setItems(prev => prev.filter(i => i._id !== itemId));
-                            setDetailVisible(false);
-                        } catch (e) {
-                            Alert.alert('Error', e.response?.data?.message || 'Failed to remove listing');
-                        } finally {
-                            setIsDeleting(false);
-                        }
-                    },
-                },
-            ]
-        );
+        setItemToDelete(itemId);
+        setDeleteModalVisible(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!itemToDelete) return;
+        setIsDeleting(true);
+        try {
+            await axios.delete(`${BASE_URL}/lostfound/admin/${itemToDelete}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setItems(prev => prev.filter(i => i._id !== itemToDelete));
+            setDetailVisible(false);
+            setDeleteModalVisible(false);
+            setItemToDelete(null);
+        } catch (e) {
+            if (Platform.OS === 'web') {
+                window.alert(e.response?.data?.message || 'Failed to remove listing');
+            } else {
+                Alert.alert('Error', e.response?.data?.message || 'Failed to remove listing');
+            }
+            setDeleteModalVisible(false);
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     /* Filtered list */
@@ -451,6 +454,43 @@ export default function AdminLostFoundScreen({ navigation }) {
                 onDelete={(id) => { setDetailVisible(false); handleDelete(id); }}
                 isDeleting={isDeleting}
             />
+
+            {/* Custom Delete Confirmation Modal */}
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={deleteModalVisible}
+                onRequestClose={() => setDeleteModalVisible(false)}
+            >
+                <View style={styles.deleteModalOverlay}>
+                    <View style={styles.deleteModalContainer}>
+                        <View style={styles.deleteModalIcon}>
+                            <Ionicons name="warning" size={32} color="#EF4444" />
+                        </View>
+                        <Text style={styles.deleteModalTitle}>Delete Listing?</Text>
+                        <Text style={styles.deleteModalText}>Are you sure you want to permanently remove this listing? This action cannot be undone.</Text>
+                        <View style={styles.deleteModalActions}>
+                            <TouchableOpacity 
+                                style={styles.deleteModalBtnCancel}
+                                onPress={() => setDeleteModalVisible(false)}
+                            >
+                                <Text style={styles.deleteModalBtnCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={styles.deleteModalBtnConfirm}
+                                onPress={confirmDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? (
+                                    <ActivityIndicator size="small" color="#FFF" />
+                                ) : (
+                                    <Text style={styles.deleteModalBtnConfirmText}>Delete</Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -483,4 +523,16 @@ const styles = StyleSheet.create({
     emptyState:    { alignItems: 'center', marginTop: 60, paddingHorizontal: 40 },
     emptyTitle:    { fontSize: 20, fontWeight: '800', color: '#111827', marginTop: 14 },
     emptyDesc:     { fontSize: 13, color: '#9CA3AF', textAlign: 'center', marginTop: 6, lineHeight: 20 },
+
+    // Delete Modal Styles
+    deleteModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    deleteModalContainer: { width: '100%', maxWidth: 340, backgroundColor: '#FFF', borderRadius: 24, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20, elevation: 10 },
+    deleteModalIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+    deleteModalTitle: { fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 },
+    deleteModalText: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 24, lineHeight: 20 },
+    deleteModalActions: { flexDirection: 'row', gap: 12, width: '100%' },
+    deleteModalBtnCancel: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center' },
+    deleteModalBtnCancelText: { fontSize: 15, fontWeight: '700', color: '#4B5563' },
+    deleteModalBtnConfirm: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 4 },
+    deleteModalBtnConfirmText: { fontSize: 15, fontWeight: '700', color: '#FFFFFF' },
 });

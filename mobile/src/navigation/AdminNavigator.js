@@ -19,6 +19,7 @@ import AdminNoticeManagementScreen from '../features/admin/notices/AdminNoticeMa
 import AdminClubManagementScreen from '../features/admin/clubs/AdminClubManagementScreen';
 import AdminComplaintsScreen from '../features/admin/complaints/AdminComplaintsScreen';
 import AdminLostFoundScreen from '../features/admin/lostfound/AdminLostFoundScreen';
+import AdminResourceManagementScreen from '../features/admin/resources/AdminResourceManagementScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -144,6 +145,11 @@ export default function AdminNavigator() {
             <Tab.Screen 
                 name="AdminLostFound" 
                 component={AdminLostFoundScreen} 
+                options={{ headerShown: false }} 
+            />
+            <Tab.Screen 
+                name="AdminResourceManagement" 
+                component={AdminResourceManagementScreen} 
                 options={{ headerShown: false }} 
             />
         </Tab.Navigator>
