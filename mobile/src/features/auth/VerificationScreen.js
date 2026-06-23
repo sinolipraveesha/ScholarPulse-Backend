@@ -23,7 +23,14 @@ export default function VerificationScreen({ route, navigation }) {
                 body: JSON.stringify({ email, otp })
             });
 
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                setLoading(false);
+                return alert(`Server returned non-JSON response: ${text.substring(0, 150)}`);
+            }
             setLoading(false);
 
             if (data.status === 'success') {

@@ -31,7 +31,13 @@ export const AuthProvider = ({ children }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fullName, email, studentId, password })
             });
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 150)}`);
+            }
             setIsLoading(false);
             if (!response.ok) throw data;
             return data;
@@ -49,7 +55,13 @@ export const AuthProvider = ({ children }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 150)}`);
+            }
             
             if (response.ok && data.status === 'success') {
                 const { token: userToken, ...userData } = data.data;
@@ -82,7 +94,13 @@ export const AuthProvider = ({ children }) => {
                 body: JSON.stringify(payload)
             });
 
-            const data = await response.json();
+            const text = await response.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (err) {
+                throw new Error(`Server returned non-JSON response: ${text.substring(0, 150)}`);
+            }
 
             if (response.ok && data.status === 'success') {
                 const { token: newToken, ...userData } = data.data;
