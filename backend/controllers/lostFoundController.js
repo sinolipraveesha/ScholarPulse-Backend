@@ -122,10 +122,49 @@ const adminDeleteLostFoundItem = async (req, res) => {
     }
 };
 
+// @desc    Update item status (active -> claimed -> resolved)
+// @route   PATCH /api/lostfound/:id/status
+// @access  Private (owner only)
+const updateItemStatus = async (req, res) => {
+    try {
+        const { status } = req.body;
+        const validStatuses = ['active', 'claimed', 'resolved'];
+
+        if (!status || !validStatuses.includes(status)) {
+            return res.status(400).json({ message: 'Invalid status. Must be: active, claimed, or resolved' });
+        }
+
+        const item = await LostFoundItem.findById(req.params.id);
+        console.log('UpdateItemStatus called with ID:', req.params.id);
+        console.log('Item found:', item);
+
+        if (!item) {
+            return res.status(404).json({ message: 'Item not found' });
+        }
+
+        // Check ownership
+        if (item.reporter.toString() !== req.user._id.toString()) {
+            return res.status(401).json({ message: 'Not authorized to update this item status' });
+        }
+
+        item.status = status;
+        await item.save();
+
+        const updatedItem = await LostFoundItem.findById(item._id)
+            .populate('reporter', 'fullName avatar email phoneNumber');
+
+        res.status(200).json(updatedItem);
+    } catch (error) {
+        console.error('Error updating item status:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 module.exports = {
     getLostFoundItems,
     createLostFoundItem,
     updateLostFoundItem,
     deleteLostFoundItem,
     adminDeleteLostFoundItem,
+    updateItemStatus,
 };
